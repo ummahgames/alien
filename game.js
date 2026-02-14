@@ -29,14 +29,31 @@ let gameActive = true;
 let currentAlien = ALIENS[0];
 let scans = 0;
 let bestScans = Infinity;
+let bestAdjustedScore = Infinity;  // scans / diameter, lower is better
+let bestLevel = 0;
 let currentLevel = 1;
+let currentHexRadius = 2;  // For best-score normalization
 let confetti = [];
 let maxHexDist = 4;  // Max axial distance for color scaling (updated per level)
-const MAX_LEVEL = 6;  // Level 1 = radius 2, level 6 = radius 7
+const MAX_LEVEL = 8;  // Slower growth: L1-2 r=2, L3-4 r=3, L5-6 r=4, L7-8 r=5
+
+// Camera: zoom & pan for adaptive viewport (mouse wheel, pinch, drag)
+let cameraZoom = 1;
+let cameraX = 0;
+let cameraY = 0;
+let isDragging = false;
+let lastMouseX = 0, lastMouseY = 0;
+let lastPinchDist = 0;
+let lastPinchCenter = { x: 0, y: 0 };
+let touches = {};
+let didDrag = false;
+let dragStartX = 0, dragStartY = 0;
+let didTouchPan = false;
+let touchStartX = 0, touchStartY = 0;
 const HEX_SIZE = 37;  // Tighter spacing for denser grid
-// Tile size matches hex cell to prevent overlap (no two props on same visual tile)
-const TILE_W = Math.floor(HEX_SIZE * Math.sqrt(3));   // ~64
-const TILE_H = HEX_SIZE * 2;                          // ~74
+// Tile size: +1 to eliminate thin gaps between adjacent hexes (floor truncation)
+const TILE_W = Math.floor(HEX_SIZE * Math.sqrt(3)) + 1;   // ~65
+const TILE_H = HEX_SIZE * 2 + 1;                          // ~75
 
 // 1. Asset Preloader
 async function loadAssets() {
@@ -58,7 +75,9 @@ function initGame(advanceLevel = false) {
     if (advanceLevel && !gameActive) {
         currentLevel = Math.min(currentLevel + 1, MAX_LEVEL);
     }
-    const hexRadius = currentLevel + 1;  // Level 1: radius 2, Level 6: radius 7
+    // Slower map growth: level 1→2 radius 2, level 3→4 radius 3, level 5→6 radius 4
+    const hexRadius = 2 + Math.floor(currentLevel * 0.5);
+    currentHexRadius = hexRadius;
     maxHexDist = hexRadius * 2;  // Max axial distance for warmer/colder shading
 
     grid = [];
@@ -67,6 +86,7 @@ function initGame(advanceLevel = false) {
     lastDist = null;
     scans = 0;
     scanEl.innerText = scans;
+    bestEl.innerText = bestAdjustedScore === Infinity ? "--" : `${bestScans} (L${bestLevel})`;
     currentAlien = ALIENS[Math.floor(Math.random() * ALIENS.length)];
     document.getElementById('message').innerText = "FIND THE ALIEN!";
     document.getElementById('message').style.color = "white";
@@ -103,10 +123,12 @@ function initGame(advanceLevel = false) {
     }
 
     targetHex = grid[Math.floor(Math.random() * grid.length)];
-    resize();
+    resize();  // Set canvas size first
+    fitZoomToScreen();
+    draw();
 }
 
-// Hex to pixel (flat-top axial coordinates)
+// Hex to pixel (flat-top axial coordinates) - returns world-space coords
 function hexToPixel(q, r) {
     return {
         x: canvas.width / 2 + HEX_SIZE * (Math.sqrt(3) * q + Math.sqrt(3) / 2 * r),
@@ -114,10 +136,53 @@ function hexToPixel(q, r) {
     };
 }
 
+// Screen coords -> world coords (for click detection with camera transform)
+function screenToWorld(sx, sy) {
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    return {
+        x: (sx - cx - cameraX) / cameraZoom + cx,
+        y: (sy - cy - cameraY) / cameraZoom + cy
+    };
+}
+
+// Compute grid bounds: flat-top hex extent = HEX_SIZE horiz, HEX_SIZE*sqrt3/2 vert
+function getGridBounds() {
+    if (grid.length === 0) return { w: 400, h: 400 };
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    const hexW = HEX_SIZE;
+    const hexH = HEX_SIZE * Math.sqrt(3) / 2;
+    grid.forEach(hex => {
+        const { x, y } = hexToPixel(hex.q, hex.r);
+        minX = Math.min(minX, x - hexW);
+        maxX = Math.max(maxX, x + hexW);
+        minY = Math.min(minY, y - hexH);
+        maxY = Math.max(maxY, y + hexH);
+    });
+    return { w: maxX - minX, h: maxY - minY, minX, minY, maxX, maxY };
+}
+
+function fitZoomToScreen() {
+    const bounds = getGridBounds();
+    const padding = 50;
+    const scaleX = (canvas.width - padding) / bounds.w;
+    const scaleY = (canvas.height - padding) / bounds.h;
+    cameraZoom = Math.min(1.2, Math.max(0.35, Math.min(scaleX, scaleY)));
+    cameraX = 0;
+    cameraY = 0;
+}
+
 // 3. Rendering Logic
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     grid.sort((a, b) => (a.r - b.r) || (a.q - b.q)); // Painter's Sort: row first, then column
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    ctx.save();
+    ctx.translate(cx + cameraX, cy + cameraY);
+    ctx.scale(cameraZoom, cameraZoom);
+    ctx.translate(-cx, -cy);
 
     grid.forEach(hex => {
         const { x, y } = hexToPixel(hex.q, hex.r);
@@ -161,7 +226,9 @@ function draw() {
         }
     });
 
-    // Confetti overlay when mission success
+    ctx.restore();
+
+    // Confetti overlay when mission success (screen space)
     confetti.forEach(p => {
         p.x += p.vx;
         p.y += p.vy;
@@ -184,10 +251,10 @@ function drawHexMask(x, y, distToTarget) {
     const r = HEX_SIZE;
     // t: 0 = warm (red), 1 = cold (blue); dist 1 = warmest wrong, maxHexDist = coldest
     const t = Math.min(1, Math.max(0, (distToTarget - 1) / Math.max(1, maxHexDist - 1)));
-    const red = Math.round(255 - t * 180);
-    const green = Math.round(100 - t * 80);
-    const blue = Math.round(80 + t * 175);
-    ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, 0.45)`;
+    const red = Math.round(255 - t * 205);   // Strong red when warm
+    const green = Math.round(60 - t * 60);   // Low green for vivid red/blue
+    const blue = Math.round(60 + t * 195);   // Strong blue when cold
+    ctx.fillStyle = `rgba(${red}, ${green}, ${blue}, 0.6)`;
     ctx.beginPath();
     for (let i = 0; i < 6; i++) {
         const angle = (Math.PI / 3) * i + Math.PI / 6;
@@ -203,10 +270,13 @@ function drawHexMask(x, y, distToTarget) {
 // 4. Input Handling
 canvas.addEventListener('click', (e) => {
     if (!gameActive) return;
+    if (didDrag) { didDrag = false; return; }  // Ignore click if we were mouse-dragging
+    if (didTouchPan) { didTouchPan = false; return; }  // Ignore click if we were touch-panning
 
     const rect = canvas.getBoundingClientRect();
-    const cx = (e.clientX - rect.left) * (canvas.width / rect.width);
-    const cy = (e.clientY - rect.top) * (canvas.height / rect.height);
+    const screenX = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const screenY = (e.clientY - rect.top) * (canvas.height / rect.height);
+    const { x: cx, y: cy } = screenToWorld(screenX, screenY);
 
     let clickedHex = null;
     let minDist = Math.min(40, TILE_W * 0.6);
@@ -268,9 +338,13 @@ function handleWin() {
     msg.innerText = "MISSION SUCCESS!";
     msg.style.color = "#4ade80";
 
-    if (scans < bestScans) {
+    const diameter = 2 * currentHexRadius;
+    const adjustedScore = scans / diameter;
+    if (adjustedScore < bestAdjustedScore) {
+        bestAdjustedScore = adjustedScore;
         bestScans = scans;
-        bestEl.innerText = bestScans;
+        bestLevel = currentLevel;
+        bestEl.innerText = `${bestScans} (L${bestLevel})`;
     }
 
     const btn = document.getElementById('newMissionBtn');
@@ -282,6 +356,99 @@ function resize() {
     canvas.height = window.innerHeight;
     draw();
 }
+
+// Mouse wheel: zoom toward cursor
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const screenX = (e.clientX - rect.left) * (canvas.width / rect.width);
+    const screenY = (e.clientY - rect.top) * (canvas.height / rect.height);
+    const cx = canvas.width / 2, cy = canvas.height / 2;
+    const wx = (screenX - cx - cameraX) / cameraZoom + cx;
+    const wy = (screenY - cy - cameraY) / cameraZoom + cy;
+    const factor = e.deltaY > 0 ? 0.9 : 1.1;
+    const newZoom = Math.min(2.5, Math.max(0.25, cameraZoom * factor));
+    cameraX = screenX - cx - (wx - cx) * newZoom;
+    cameraY = screenY - cy - (wy - cy) * newZoom;
+    cameraZoom = newZoom;
+    draw();
+}, { passive: false });
+
+// Mouse drag: pan
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button !== 0) return;
+    isDragging = true;
+    didDrag = false;
+    dragStartX = e.clientX;
+    dragStartY = e.clientY;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+});
+canvas.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    if (Math.hypot(e.clientX - dragStartX, e.clientY - dragStartY) > 8) didDrag = true;
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
+    cameraX += (e.clientX - lastMouseX) * scaleX;
+    cameraY += (e.clientY - lastMouseY) * scaleY;
+    lastMouseX = e.clientX;
+    lastMouseY = e.clientY;
+    draw();
+});
+canvas.addEventListener('mouseup', () => { isDragging = false; });
+canvas.addEventListener('mouseleave', () => { isDragging = false; });
+
+// Touch: pinch zoom + one/two-finger pan
+function getTouchCenter(touchesList) {
+    const t = Array.from(touchesList);
+    return {
+        x: t.reduce((s, p) => s + p.clientX, 0) / t.length,
+        y: t.reduce((s, p) => s + p.clientY, 0) / t.length
+    };
+}
+function getTouchDist(touchesList) {
+    const t = Array.from(touchesList);
+    if (t.length < 2) return 0;
+    return Math.hypot(t[1].clientX - t[0].clientX, t[1].clientY - t[0].clientY);
+}
+let lastTouchCenter = { x: 0, y: 0 };
+canvas.addEventListener('touchstart', (e) => {
+    didTouchPan = false;
+    lastTouchCenter = getTouchCenter(e.touches);
+    touchStartX = lastTouchCenter.x;
+    touchStartY = lastTouchCenter.y;
+    if (e.touches.length >= 2) {
+        e.preventDefault();
+        lastPinchDist = getTouchDist(e.touches);
+        lastPinchCenter = lastTouchCenter;
+    }
+}, { passive: false });
+canvas.addEventListener('touchmove', (e) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width, scaleY = canvas.height / rect.height;
+    if (e.touches.length >= 2) {
+        e.preventDefault();
+        const dist = getTouchDist(e.touches);
+        const center = getTouchCenter(e.touches);
+        const factor = dist / lastPinchDist;
+        cameraZoom = Math.min(2.5, Math.max(0.25, cameraZoom * factor));
+        cameraX += (center.x - lastPinchCenter.x) * scaleX;
+        cameraY += (center.y - lastPinchCenter.y) * scaleY;
+        lastPinchDist = dist;
+        lastPinchCenter = center;
+    } else if (e.touches.length === 1) {
+        e.preventDefault();
+        const center = getTouchCenter(e.touches);
+        if (Math.hypot(center.x - touchStartX, center.y - touchStartY) > 10) didTouchPan = true;
+        cameraX += (center.x - lastTouchCenter.x) * scaleX;
+        cameraY += (center.y - lastTouchCenter.y) * scaleY;
+        lastTouchCenter = center;
+    }
+    if (e.touches.length >= 1) draw();
+}, { passive: false });
+canvas.addEventListener('touchend', (e) => {
+    if (e.touches.length > 0) lastTouchCenter = getTouchCenter(e.touches);
+});
 
 window.addEventListener('resize', resize);
 loadAssets();

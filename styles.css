@@ -35,6 +35,7 @@ body {
 
 canvas {
     display: block;
+    touch-action: none;  /* Allow custom pinch/pan, prevent browser zoom on canvas */
 }
 
 .btn-container {
