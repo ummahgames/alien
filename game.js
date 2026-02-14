@@ -246,9 +246,10 @@ function draw() {
     if (!gameActive) requestAnimationFrame(draw);
 }
 
-// Draws a hexagon-shaped overlay: reddish (warmer/closer) to bluish (colder/farther)
+// Draws an isometric hexagon overlay: squashed Y so it lies on the tile's top surface
 function drawHexMask(x, y, distToTarget) {
-    const r = HEX_SIZE;
+    const r = HEX_SIZE;  // Full size to cover the tile surface
+    const isoY = 0.78;  // Light vertical squash for isometric (less compressed)
     // t: 0 = warm (red), 1 = cold (blue); dist 1 = warmest wrong, maxHexDist = coldest
     const t = Math.min(1, Math.max(0, (distToTarget - 1) / Math.max(1, maxHexDist - 1)));
     const red = Math.round(255 - t * 205);   // Strong red when warm
@@ -259,7 +260,7 @@ function drawHexMask(x, y, distToTarget) {
     for (let i = 0; i < 6; i++) {
         const angle = (Math.PI / 3) * i + Math.PI / 6;
         const hx = x + r * Math.cos(angle);
-        const hy = y + r * Math.sin(angle);
+        const hy = y + (r * isoY) * Math.sin(angle);
         if (i === 0) ctx.moveTo(hx, hy);
         else ctx.lineTo(hx, hy);
     }
