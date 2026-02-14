@@ -5,11 +5,14 @@ body {
     overflow: hidden;
     color: white;
     user-select: none;
+    display: flex;
+    flex-direction: column;
+    height: 100vh;
 }
 
 #ui {
-    position: absolute;
-    top: 10px;
+    flex-shrink: 0;
+    padding: 12px 0;
     width: 100%;
     text-align: center;
     pointer-events: none;
@@ -33,14 +36,17 @@ body {
     border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-canvas {
+#gameCanvas {
+    flex: 1;
+    min-height: 0;
+    width: 100%;
     display: block;
     touch-action: none;  /* Allow custom pinch/pan, prevent browser zoom on canvas */
 }
 
 .btn-container {
-    position: absolute;
-    bottom: 30px;
+    flex-shrink: 0;
+    padding: 20px 0;
     width: 100%;
     text-align: center;
 }

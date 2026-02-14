@@ -353,8 +353,12 @@ function handleWin() {
 }
 
 function resize() {
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
+    // Canvas fills space between UI and button (flex layout)
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, rect.width);
+    const h = Math.max(1, rect.height);
+    canvas.width = w;
+    canvas.height = h;
     draw();
 }
 
