@@ -1,0 +1,66 @@
+body {
+    margin: 0;
+    background: #0f172a;
+    font-family: 'Segoe UI', sans-serif;
+    overflow: hidden;
+    color: white;
+    user-select: none;
+}
+
+#ui {
+    position: absolute;
+    top: 10px;
+    width: 100%;
+    text-align: center;
+    pointer-events: none;
+}
+
+#message {
+    font-size: 3.5rem;
+    font-weight: 900;
+    text-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
+    margin: 0;
+    filter: drop-shadow(0 0 10px rgba(255, 255, 255, 0.2));
+}
+
+#stats {
+    font-size: 1.5rem;
+    margin-top: 10px;
+    background: rgba(15, 23, 42, 0.7);
+    display: inline-block;
+    padding: 8px 20px;
+    border-radius: 30px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+canvas {
+    display: block;
+}
+
+.btn-container {
+    position: absolute;
+    bottom: 30px;
+    width: 100%;
+    text-align: center;
+}
+
+button {
+    padding: 15px 40px;
+    font-size: 1.3rem;
+    font-weight: bold;
+    cursor: pointer;
+    background: linear-gradient(135deg, #6366f1, #a855f7);
+    color: white;
+    border: none;
+    border-radius: 50px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+    transition: transform 0.2s;
+}
+
+button:hover {
+    transform: scale(1.05);
+}
+
+button:active {
+    transform: scale(0.95);
+}

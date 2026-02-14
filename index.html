@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Alien Explorer: Multi-Biome Seek</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div id="ui">
+        <p id="message">SCAN THE PLANET</p>
+        <div id="stats">Level <span id="level">1</span> | Scans: <span id="scan-count">0</span> | Best: <span id="best-count">--</span></div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div class="btn-container">
+        <button id="newMissionBtn" onclick="initGame(!gameActive && document.getElementById('newMissionBtn').innerText.includes('Next'))">✨ New Mission</button>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>
