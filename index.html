@@ -1,24 +1,58 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Alien Explorer: Multi-Biome Seek</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-
-    <div id="ui">
-        <p id="message">SCAN THE PLANET</p>
-        <div id="stats">Level <span id="level">1</span> | Scans: <span id="scan-count">0</span> | Best: <span id="best-count">--</span></div>
-    </div>
-
-    <canvas id="gameCanvas"></canvas>
-
-    <div class="btn-container">
-        <button id="newMissionBtn" onclick="initGame(!gameActive && document.getElementById('newMissionBtn').innerText.includes('Next'))">✨ New Mission</button>
-    </div>
-
-    <script src="game.js"></script>
-</body>
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#101c24" />
+    <meta
+      name="description"
+      content="Explore six little planets, decipher alien signals, and bring 42 stranded crews home. An offline-friendly deduction adventure."
+    />
+    <title>Alien — The Little Rescue Agency</title>
+    <link rel="icon" href="icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <button
+        class="brand"
+        id="homeButton"
+        aria-label="Alien Rescue Agency home"
+      >
+        <span class="brand-symbol">✳</span
+        ><span>ALIEN<span class="brand-sub">LITTLE RESCUE AGENCY</span></span>
+      </button>
+      <nav aria-label="Main navigation">
+        <button id="atlasButton">Atlas</button
+        ><button id="journalButton">
+          Crew log <span id="crewCount" class="nav-count">0</span></button
+        ><button id="settingsButton" aria-label="Settings" class="icon-button">
+          ⚙
+        </button>
+      </nav>
+    </header>
+    <main id="app">
+      <p class="loading">
+        Tuning the beacons. Your little expedition is almost ready…
+      </p>
+    </main>
+    <div
+      id="announcement"
+      class="sr-only"
+      aria-live="polite"
+      aria-atomic="true"
+    ></div>
+    <div id="toast" role="status" hidden></div>
+    <dialog id="modal">
+      <button id="closeModal" class="close-button" aria-label="Close dialog">
+        ×
+      </button>
+      <div id="modalContent"></div>
+    </dialog>
+    <script type="module" src="game.js"></script>
+  </body>
 </html>
